@@ -1,50 +1,104 @@
-# Django REST API
+# Project1CS Backend
 
-A Django REST API project with Django REST Framework.
+Django REST API backend for student-company matching platform.
 
-## Setup
+## Features
 
-1. Create and activate virtual environment:
+- 🔐 JWT Authentication (Students & Companies)
+- 👤 User Profiles (Student & Company)
+- 🎓 Academic System (Domains, Specialties, Universities)
+- 💼 Offers Management (Stages, PFE, Emploi)
+- 📨 Applications Workflow
+- 🔔 Notifications System
+- 🚨 Alerts & Saved Searches
+- 📊 Analytics & Statistics
+- 🛡️ Moderation System
+
+## Quick Start
+
+### Development
+
+1. **Setup Environment**
 ```bash
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
+pip install -r requirements/dev.txt
 ```
 
-2. Install dependencies:
+2. **Configure Environment**
 ```bash
-pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your settings
 ```
 
-3. Run migrations:
+3. **Run Migrations**
 ```bash
 python manage.py migrate
-```
-
-4. Create superuser (optional):
-```bash
 python manage.py createsuperuser
 ```
 
-5. Run development server:
+4. **Run Server**
 ```bash
 python manage.py runserver
 ```
 
-The API will be available at `http://127.0.0.1:8000/`
+### With Docker
 
-## Features
-
-- Django 5.2.8
-- Django REST Framework 3.16.1
-- CORS headers configured for frontend at localhost:3000
-- SQLite database (default)
+```bash
+docker-compose up -d
+docker-compose exec web python manage.py migrate
+docker-compose exec web python manage.py createsuperuser
+```
 
 ## Project Structure
 
 ```
 backend/
-├── config/          # Project settings
-├── manage.py        # Django management script
-├── venv/            # Virtual environment
-└── requirements.txt # Python dependencies
+├── apps/               # All Django apps
+│   ├── accounts/       # Authentication
+│   ├── profiles/       # User profiles
+│   ├── academic/       # Academic data
+│   ├── skills/         # Skills management
+│   ├── experiences/    # Work/education history
+│   ├── offers/         # Job offers
+│   ├── applications/   # Applications workflow
+│   ├── notifications/  # Notifications
+│   ├── alerts/         # Search alerts
+│   ├── analytics/      # Statistics
+│   ├── moderation/     # Admin moderation
+│   └── core/           # Shared utilities
+├── config/             # Django settings
+├── media/              # Uploaded files
+├── static/             # Static files
+├── docs/               # Documentation
+├── tests/              # Global tests
+└── requirements/       # Dependencies
 ```
+
+## API Documentation
+
+See [docs/API.md](docs/API.md) for complete API documentation.
+
+## Testing
+
+```bash
+pytest
+pytest --cov=apps
+```
+
+## Deployment
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for deployment instructions.
+
+## Technology Stack
+
+- Django 5.2.8
+- Django REST Framework 3.16.1
+- PostgreSQL (production)
+- Redis (caching & Celery)
+- Celery (async tasks)
+- JWT Authentication
+
+## License
+
+MIT
