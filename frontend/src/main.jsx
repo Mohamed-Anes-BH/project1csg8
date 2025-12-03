@@ -10,6 +10,7 @@ import Profile from './pages/Profile.jsx'
 import Settings from './pages/Settings.jsx'
 import OffresList from './pages/OffresList.jsx'
 import EnterpriseFirst from './pages/EnterpriseFirst.jsx'
+import Contact from './pages/contact.jsx'
 import Navbar from './component/navbar.jsx'
 
 function Layout() {
@@ -23,6 +24,7 @@ function Layout() {
         <Route path="/" element={<Home />} />
         <Route path="/offres" element={<OffresList />} />
         <Route path="/entreprises" element={<EnterpriseFirst />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/profile" element={<Profile />} />
