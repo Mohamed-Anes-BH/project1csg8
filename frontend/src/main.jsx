@@ -8,6 +8,7 @@ import SignIn from './pages/SignIn.jsx'
 import SignUp from './pages/SignUp.jsx'
 import Profile from './pages/Profile.jsx'
 import Settings from './pages/Settings.jsx'
+import OffresList from './pages/OffresList.jsx'
 import Navbar from './component/navbar.jsx'
 
 createRoot(document.getElementById('root')).render(
@@ -16,6 +17,7 @@ createRoot(document.getElementById('root')).render(
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/offres" element={<OffresList />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/profile" element={<Profile />} />
