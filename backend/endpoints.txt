@@ -1,0 +1,274 @@
+###############################################################################
+# DZ-STAGIAIRE - API ENDPOINTS (Format HTTP pour tests)
+# Base URL: http://localhost:8000
+###############################################################################
+
+### 1. CORE - Lister les Universités
+### GET http://localhost:8000/api/core/universities/
+
+### 2. CORE - Lister les Domaines
+### GET http://localhost:8000/api/core/domains/
+
+### 3. CORE - Lister les Spécialités d'un Domaine
+### GET http://localhost:8000/api/core/domains/1/specialties/
+
+###############################################################################
+# AUTHENTIFICATION JWT
+###############################################################################
+
+### 4. Inscription Étudiant
+### POST http://localhost:8000/api/auth/register/student/
+Content-Type: application/json
+
+{
+  "email": "ahmed.test@usthb.dz",
+  "password": "password123",
+  "first_name": "Ahmed",
+  "last_name": "Benali",
+  "university_id": 1,
+  "domain_id": 1,
+  "specialty_id": 1
+}
+
+### 5. Inscription Entreprise
+### POST http://localhost:8000/api/auth/register/company/
+Content-Type: application/json
+
+{
+  "email": "contact@techcorp.dz",
+  "password": "password123",
+  "company_name": "TechCorp Algérie",
+  "description": "Leader en solutions IT",
+  "sector": "Informatique",
+  "website": "https://techcorp.dz"
+}
+
+### 6. Vérification Email
+### GET http://localhost:8000/api/auth/verify-email/fwQvW9iTqCD01Eh0jt8NXg/
+
+### 7. Connexion (Obtenir JWT)
+### POST http://localhost:8000/api/auth/login/
+Content-Type: application/json
+
+{
+  "email": "ahmed.test@usthb.dz",
+  "password": "password123"
+}
+
+### 8. Refresh Token
+### POST http://localhost:8000/api/auth/token/refresh/
+Content-Type: application/json
+
+{
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+###############################################################################
+# PROFILS
+###############################################################################
+
+### 9. Voir Profil Étudiant
+### GET http://localhost:8000/api/auth/student/profile/?user_id=1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 10. Mettre à Jour Profil Étudiant
+### PUT http://localhost:8000/api/auth/student/profile/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+{
+  "user_id": 1,
+  "first_name": "Ahmed",
+  "last_name": "Benali",
+  "skills": "Python, Django, React",
+  "experience": "Stage chez XYZ",
+  "education": "Master en Informatique",
+  "portfolio_link": "https://portfolio.com",
+  "github_link": "https://github.com/ahmed",
+  "cv_visibility": "PUBLIC"
+}
+
+### 11. Voir Profil Entreprise
+### GET http://localhost:8000/api/auth/company/profile/?user_id=2
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 12. Mettre à Jour Profil Entreprise
+### PUT http://localhost:8000/api/auth/company/profile/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+{
+  "user_id": 2,
+  "company_name": "TechCorp",
+  "description": "Leader en IT",
+  "sector": "Informatique",
+  "website": "https://techcorp.dz"
+}
+
+###############################################################################
+# OFFRES
+###############################################################################
+
+### 13. Lister Toutes les Offres
+### GET http://localhost:8000/api/offers/
+
+### 14. Recherche par Mot-Clé
+### GET http://localhost:8000/api/offers/?keyword=stage
+
+### 15. Filtrer par Type
+### GET http://localhost:8000/api/offers/?type=PFE
+
+### 16. Filtrer par Localisation (NOUVEAU)
+### GET http://localhost:8000/api/offers/?location=Alger
+
+### 17. Filtrer par Secteur (NOUVEAU)
+### GET http://localhost:8000/api/offers/?sector=Informatique
+
+### 18. Filtres Combinés
+### GET http://localhost:8000/api/offers/?keyword=développeur&location=Alger&type=STAGE
+
+### 19. Voir Détail d'une Offre
+### GET http://localhost:8000/api/offers/1/
+
+### 20. Créer une Offre (Entreprise)
+### POST http://localhost:8000/api/offers/create/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+{
+  "company_id": 1,
+  "title": "Stage Développeur Full Stack",
+  "description": "Stage de 6 mois en développement web",
+  "offer_type": "STAGE",
+  "duration": "6 mois",
+  "location": "Alger Centre",
+  "is_targeted": true,
+  "specialty_ids": [1, 6],
+  "university_ids": [1, 2]
+}
+
+### 21. Offres Recommandées - Matching (NOUVEAU)
+### GET http://localhost:8000/api/offers/recommended/?student_id=1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 22. Postuler à une Offre (Étudiant)
+### POST http://localhost:8000/api/offers/1/apply/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+{
+  "student_id": 1
+}
+
+###############################################################################
+# DASHBOARD ENTREPRISE
+###############################################################################
+
+### 23. Dashboard Complet
+### GET http://localhost:8000/api/offers/company/dashboard/?company_id=1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 24. Changer Statut d'une Candidature
+### PUT http://localhost:8000/api/offers/applications/1/status/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+{
+  "status": "EN_COURS"
+}
+
+###############################################################################
+# NOTES
+###############################################################################
+# - Remplacer les tokens JWT par les vrais tokens obtenus lors du login
+# - Le serveur doit être lancé: cd backend && venv/bin/python manage.py runserver
+# - Compatible avec: Postman, Insomnia, VS Code REST Client
+
+###############################################################################
+# 🆕 NOUVELLES FONCTIONNALITÉS MVP
+###############################################################################
+
+### 25. NOTIFICATIONS - Lister les Notifications
+### GET http://localhost:8000/api/core/notifications/?user_id=1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 26. NOTIFICATIONS - Marquer comme Lue
+### POST http://localhost:8000/api/core/notifications/1/mark-read/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 27. NOTIFICATIONS - Tout Marquer comme Lu
+### POST http://localhost:8000/api/core/notifications/mark-all-read/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+{
+  "user_id": 1
+}
+
+###############################################################################
+# DASHBOARD ÉTUDIANT
+###############################################################################
+
+### 28. Dashboard Étudiant - Mes Candidatures
+### GET http://localhost:8000/api/offers/student/applications/?student_id=1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+###############################################################################
+# GESTION DES OFFRES (ENTREPRISE)
+###############################################################################
+
+### 29. Modifier une Offre
+### PUT http://localhost:8000/api/offers/1/update/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+{
+  "title": "Stage Développeur Full Stack (Modifié)",
+  "description": "Description mise à jour",
+  "offer_type": "STAGE",
+  "duration": "6 mois",
+  "location": "Alger",
+  "is_targeted": true,
+  "specialty_ids": [1, 2],
+  "university_ids": [1]
+}
+
+### 30. Archiver une Offre
+### POST http://localhost:8000/api/offers/1/archive/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 31. Supprimer une Offre
+### DELETE http://localhost:8000/api/offers/1/delete/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+###############################################################################
+# STATISTIQUES
+###############################################################################
+
+### 32. Statistiques d'une Offre
+### GET http://localhost:8000/api/offers/1/statistics/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+###############################################################################
+# RECHERCHE DE PROFILS (ENTREPRISE)
+###############################################################################
+
+### 33. Rechercher des Profils Étudiants
+### GET http://localhost:8000/api/auth/students/search/?keyword=Python&specialty_id=1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 34. Recherche Avancée de Profils
+### GET http://localhost:8000/api/auth/students/search/?specialty_id=1&university_id=1&domain_id=1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+###############################################################################
+# FILTRAGE DES OFFRES CIBLÉES
+###############################################################################
+
+### 35. Liste des Offres avec Filtrage par Université Étudiant
+### GET http://localhost:8000/api/offers/?student_id=1
+# Filtre automatiquement les offres ciblées selon l'université de l'étudiant
+
+### 36. Recherche avec Filtrage Ciblé
+### GET http://localhost:8000/api/offers/?student_id=1&keyword=stage&location=Alger
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...

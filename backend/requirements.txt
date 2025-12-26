@@ -3,3 +3,9 @@ djangorestframework==3.16.1
 django-cors-headers==4.9.0
 pymysql==1.1.0
 cryptography
+
+pandas
+openpyxl
+djangorestframework-simplejwt
+python-decouple
+
