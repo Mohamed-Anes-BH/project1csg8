@@ -6,8 +6,10 @@ from core.db import execute_query, queries
 from core.notifications import create_notification
 from core.utils import paginate_results
 from core.logs import log_action
-from core.email import send_status_update_email
+from core.email import send_status_update_email, send_application_notification
 
+
+from django.conf import settings
 
 class ApplicationListView(APIView):
     """
@@ -36,6 +38,15 @@ class ApplicationListView(APIView):
             return Response({'error': 'Rôle invalide'}, status=status.HTTP_400_BAD_REQUEST)
             
         apps = apps or []
+        
+        # Process absolute URLs for Company view
+        if request.user.role == 'COMPANY' and apps:
+            for app in apps:
+                if app.get('avatar_path'):
+                    app['avatar_path'] = request.build_absolute_uri(settings.MEDIA_URL + app['avatar_path'])
+                if app.get('cv_path'):
+                    app['cv_path'] = request.build_absolute_uri(settings.MEDIA_URL + app['cv_path'])
+
         paginated_apps = paginate_results(apps, page, limit)
         
         return Response({
@@ -75,14 +86,52 @@ class ApplyView(APIView):
             
         execute_query(queries['create_application'], (offer_id, request.user.id), commit=True)
         
-        # Notifier l'entreprise
+        # Notifier l'entreprise (notification en base + email)
         company = execute_query(queries['get_company_id_by_offer'], (offer_id,), fetch_one=True)
         if company:
+            offer_title = offer.get('title', 'Offre')
+            offer_type = offer.get('type', None)
+            
+            # Déterminer le type d'offre pour le message
+            offer_type_labels = {
+                'STAGE': 'stage',
+                'PFE': 'PFE',
+                'INTERNSHIP': 'stage',
+                'JOB': 'offre'
+            }
+            offer_label = offer_type_labels.get(offer_type, 'offre') if offer_type else 'offre'
+            
+            # Créer la notification en base
             create_notification(
                 company['company_id'], 
                 "Nouvelle candidature", 
-                f"Un étudiant a postulé à votre offre: {offer.get('title', 'Offre')}"
+                f"Un étudiant a postulé à votre {offer_label}: {offer_title}"
             )
+            
+            # Envoyer un email à l'entreprise
+            # Récupérer le nom de l'étudiant
+            student_info = execute_query(
+                "SELECT s.first_name, s.last_name FROM students s WHERE s.user_id = %s",
+                (request.user.id,), fetch_one=True
+            )
+            student_name = "Un étudiant"
+            if student_info and student_info.get('first_name'):
+                student_name = f"{student_info.get('first_name', '')} {student_info.get('last_name', '')}".strip()
+            
+            # Récupérer l'email de l'entreprise
+            company_user = execute_query(
+                "SELECT u.email, u.email_alerts FROM users u WHERE u.id = %s",
+                (company['company_id'],), fetch_one=True
+            )
+            
+            # Envoyer l'email si l'entreprise a activé les alertes
+            if company_user and company_user.get('email_alerts', True):
+                send_application_notification(
+                    company_user['email'],
+                    student_name,
+                    offer_title,
+                    offer_type
+                )
             
         log_action(request.user.id, "APPLY", f"Candidature soumise pour l'offre {offer_id}")
         return Response({'message': 'Candidature envoyée'}, status=status.HTTP_201_CREATED)
@@ -155,26 +204,50 @@ class UpdateApplicationStatusView(APIView):
         
         # Notifier l'étudiant du changement de statut
         if new_status:
-            # Get offer title for notification
+            # Get offer title and type for notification
             app_info = execute_query(
-                "SELECT o.title FROM applications a JOIN offers o ON a.offer_id = o.id WHERE a.id = %s",
+                "SELECT o.title, o.type FROM applications a JOIN offers o ON a.offer_id = o.id WHERE a.id = %s",
                 (pk,), fetch_one=True
             )
             offer_title = app_info['title'] if app_info else 'votre candidature'
+            offer_type = app_info['type'] if app_info else None
+            
+            # Messages personnalisés selon le statut
+            status_messages = {
+                'ACCEPTED': f"Félicitations ! Votre candidature pour '{offer_title}' a été ACCEPTÉE ! 🎉",
+                'REJECTED': f"Votre candidature pour '{offer_title}' n'a malheureusement pas été retenue.",
+                'PRESELECTED': f"Bonne nouvelle ! Vous êtes présélectionné(e) pour '{offer_title}' ! ✨",
+            }
+            notification_message = status_messages.get(
+                new_status.upper(), 
+                f"Le statut de votre candidature pour '{offer_title}' a changé: {new_status.upper()}"
+            )
             
             create_notification(
                 check['student_id'], 
                 "Mise à jour candidature", 
-                f"Le statut de votre candidature pour '{offer_title}' a changé: {new_status.upper()}"
+                notification_message
             )
             
             # Get student email for email notification
             student_info = execute_query(
-                "SELECT u.email FROM users u WHERE u.id = %s",
+                "SELECT u.email, u.email_alerts FROM users u WHERE u.id = %s",
                 (check['student_id'],), fetch_one=True
             )
-            if student_info:
-                send_status_update_email(student_info['email'], offer_title, new_status.upper())
+            
+            # Envoyer l'email si l'étudiant a activé les alertes
+            if student_info and student_info.get('email_alerts', True):
+                import threading
+                email_thread = threading.Thread(
+                    target=send_status_update_email,
+                    args=(
+                        student_info['email'], 
+                        offer_title, 
+                        new_status.upper(),
+                        offer_type
+                    )
+                )
+                email_thread.start()
             
             log_action(request.user.id, "UPDATE_APP_STATUS", f"Candidature {pk} -> {new_status.upper()}")
         
@@ -202,7 +275,8 @@ class ApplicationDetailView(APIView):
             app = execute_query(
                 """SELECT a.*, o.title as offer_title, 
                    s.first_name, s.last_name, s.title as student_title, s.bio, s.skills, s.cv_path,
-                   s.linkedin_url, s.github_url, u.email as student_email
+                   s.linkedin_url, s.github_url, s.formations, s.experiences, s.education_level,
+                   s.avatar_path, s.phone, s.wilaya, u.email as student_email
                    FROM applications a 
                    JOIN offers o ON a.offer_id = o.id 
                    JOIN students s ON a.student_id = s.user_id
@@ -215,7 +289,13 @@ class ApplicationDetailView(APIView):
             
         if not app:
             return Response({'error': 'Candidature non trouvée'}, status=status.HTTP_404_NOT_FOUND)
-            
+        
+        if request.user.role == 'COMPANY':
+            if app.get('avatar_path'):
+                app['avatar_path'] = request.build_absolute_uri(settings.MEDIA_URL + app['avatar_path'])
+            if app.get('cv_path'):
+                app['cv_path'] = request.build_absolute_uri(settings.MEDIA_URL + app['cv_path'])
+                
         return Response(app)
 
 

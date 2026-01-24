@@ -3,7 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from core.db import execute_query, queries
-from core.security import hash_password, check_password, generate_jwt, generate_token
+from core.security import hash_password, check_password, generate_jwt, generate_token, generate_verification_code
+from django.conf import settings
 from core.email import send_verification_email, send_password_reset_email
 import datetime
 
@@ -12,6 +13,7 @@ class RegisterStudentView(APIView):
     """
     Inscription d'un étudiant.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -35,7 +37,7 @@ class RegisterStudentView(APIView):
             return Response({'error': 'Cet email est déjà utilisé'}, status=status.HTTP_400_BAD_REQUEST)
 
         hashed_pw = hash_password(password)
-        verification_token = generate_token()
+        verification_token = generate_verification_code()  # 6-digit code
 
         user_id = execute_query(queries['register_user'], (email, hashed_pw, 'STUDENT', verification_token), commit=True)
 
@@ -52,6 +54,7 @@ class RegisterCompanyView(APIView):
     """
     Inscription d'une entreprise.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -76,7 +79,7 @@ class RegisterCompanyView(APIView):
             return Response({'error': 'Cet email est déjà utilisé'}, status=status.HTTP_400_BAD_REQUEST)
 
         hashed_pw = hash_password(password)
-        verification_token = generate_token()
+        verification_token = generate_verification_code()  # 6-digit code
 
         user_id = execute_query(queries['register_user'], (email, hashed_pw, 'COMPANY', verification_token), commit=True)
 
@@ -93,6 +96,7 @@ class LoginView(APIView):
     """
     Connexion utilisateur (JWT).
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -127,6 +131,7 @@ class VerifyEmailView(APIView):
     """
     Vérification de l'email par token.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -160,6 +165,7 @@ class ResendVerificationView(APIView):
     """
     Renvoyer l'email de vérification.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -171,7 +177,7 @@ class ResendVerificationView(APIView):
         if not user:
             return Response({'error': 'Email non trouvé ou déjà vérifié'}, status=status.HTTP_400_BAD_REQUEST)
 
-        new_token = generate_token()
+        new_token = generate_verification_code()  # 6-digit code
         execute_query(queries['resend_verification_token'], (new_token, email), commit=True)
         send_verification_email(email, new_token)
 
@@ -182,6 +188,7 @@ class ForgotPasswordView(APIView):
     """
     Demande de réinitialisation de mot de passe.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -207,6 +214,7 @@ class ResetPasswordView(APIView):
     """
     Réinitialisation du mot de passe avec token.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -264,12 +272,32 @@ class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response({
+        user_data = {
             'id': request.user.id,
             'email': request.user.email,
             'role': request.user.role,
             'is_verified': request.user.is_verified
-        })
+        }
+        
+        # Enrich with profile info
+        if request.user.role == 'STUDENT':
+            student = execute_query("SELECT first_name, last_name, avatar_path FROM students WHERE user_id = %s", (request.user.id,), fetch_one=True)
+            if student:
+                user_data['first_name'] = student.get('first_name')
+                user_data['last_name'] = student.get('last_name')
+                user_data['full_name'] = f"{student.get('first_name', '')} {student.get('last_name', '')}".strip() or "Étudiant"
+                if student.get('avatar_path'):
+                    user_data['avatar_url'] = request.build_absolute_uri(settings.MEDIA_URL + student['avatar_path'])
+                    
+        elif request.user.role == 'COMPANY':
+            company = execute_query("SELECT name, logo_path FROM companies WHERE user_id = %s", (request.user.id,), fetch_one=True)
+            if company:
+                user_data['company_name'] = company.get('name')
+                user_data['full_name'] = company.get('name') or "Entreprise"
+                if company.get('logo_path'):
+                    user_data['logo_url'] = request.build_absolute_uri(settings.MEDIA_URL + company['logo_path'])
+        
+        return Response(user_data)
 
 
 class ChangePasswordView(APIView):

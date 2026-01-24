@@ -30,20 +30,20 @@ def send_email(to_email, subject, body):
 
 def send_verification_email(user_email, token):
     """
-    Envoi d'un email de vérification avec token et lien.
+    Envoi d'un email de vérification avec le code.
     """
-    subject = "Vérifiez votre compte DZ-Stagiaire"
-    verification_link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+    subject = "Votre code de vérification DZ-Stagiaire"
     body = f"""Bonjour,
 
 Merci de vous être inscrit sur DZ-Stagiaire.
 
-Cliquez sur le lien suivant pour vérifier votre compte :
-{verification_link}
+Pour activer votre compte, veuillez entrer le code de vérification ci-dessous :
 
-Ou utilisez votre code de vérification : {token}
+{token}
 
-Ce lien expire dans 24 heures.
+Ce code expirera bientôt.
+
+Si vous n'avez pas demandé ce code, ignorez cet email.
 
 Cordialement,
 L'équipe DZ-Stagiaire"""
@@ -89,27 +89,49 @@ L'équipe DZ-Stagiaire"""
     return send_email(user_email, subject, body)
 
 
-def send_application_notification(company_email, student_name, offer_title):
+def send_application_notification(company_email, student_name, offer_title, offer_type=None):
     """
     Notification nouvelle candidature à une entreprise.
+    Inclut le type d'offre (Stage/PFE) si disponible.
     """
-    subject = f"Nouvelle candidature - {offer_title}"
+    # Déterminer le type d'offre en français
+    offer_type_label = ""
+    if offer_type:
+        offer_types = {
+            'STAGE': 'stage',
+            'PFE': 'projet de fin d\'études (PFE)',
+            'INTERNSHIP': 'stage',
+            'JOB': 'offre d\'emploi'
+        }
+        offer_type_label = offer_types.get(offer_type.upper(), 'offre')
+    else:
+        offer_type_label = 'offre'
+    
+    subject = f"📋 Nouvelle candidature - {offer_title}"
     body = f"""Bonjour,
 
-Un étudiant a postulé à votre offre "{offer_title}".
+Vous avez reçu une nouvelle candidature pour votre {offer_type_label} !
 
-Candidat : {student_name}
+📌 Offre : {offer_title}
+👤 Candidat : {student_name}
 
-Connectez-vous à votre espace pour consulter cette candidature.
+Connectez-vous à votre espace entreprise sur DZ-Stagiaire pour :
+• Consulter le profil complet du candidat
+• Télécharger son CV
+• Le contacter via la messagerie
+• Accepter ou refuser sa candidature
+
+Ne tardez pas à répondre aux candidatures pour attirer les meilleurs talents !
 
 Cordialement,
 L'équipe DZ-Stagiaire"""
     return send_email(company_email, subject, body)
 
 
-def send_status_update_email(student_email, offer_title, new_status):
+def send_status_update_email(student_email, offer_title, new_status, offer_type=None):
     """
     Notification changement de statut de candidature.
+    Envoie un email personnalisé selon le statut (accepté, refusé, etc.)
     """
     status_labels = {
         'PENDING': 'En attente',
@@ -119,11 +141,77 @@ def send_status_update_email(student_email, offer_title, new_status):
         'ARCHIVED': 'Archivée'
     }
     
-    subject = f"Mise à jour de votre candidature - {offer_title}"
+    # Déterminer le type d'offre en français
+    offer_type_label = ""
+    if offer_type:
+        offer_types = {
+            'STAGE': 'stage',
+            'PFE': 'projet de fin d\'études (PFE)',
+            'INTERNSHIP': 'stage',
+            'JOB': 'emploi'
+        }
+        offer_type_label = offer_types.get(offer_type.upper(), 'offre')
+    else:
+        offer_type_label = 'offre'
+    
     status_text = status_labels.get(new_status, new_status)
-    body = f"""Bonjour,
+    
+    # Messages personnalisés selon le statut
+    if new_status == 'ACCEPTED':
+        subject = f"🎉 Félicitations ! Votre candidature a été acceptée - {offer_title}"
+        body = f"""Bonjour,
 
-Le statut de votre candidature pour l'offre "{offer_title}" a été mis à jour.
+Excellente nouvelle ! 🎉
+
+Votre candidature pour le {offer_type_label} "{offer_title}" a été ACCEPTÉE !
+
+L'entreprise souhaite poursuivre avec vous. Vous serez contacté(e) prochainement pour les prochaines étapes.
+
+Nous vous félicitons pour cette réussite !
+
+Connectez-vous à votre espace pour voir les détails et contacter l'entreprise.
+
+Cordialement,
+L'équipe DZ-Stagiaire"""
+
+    elif new_status == 'REJECTED':
+        subject = f"Mise à jour de votre candidature - {offer_title}"
+        body = f"""Bonjour,
+
+Nous avons le regret de vous informer que votre candidature pour le {offer_type_label} "{offer_title}" n'a pas été retenue.
+
+Ne vous découragez pas ! Voici quelques conseils :
+• Continuez à postuler à d'autres offres correspondant à votre profil
+• Améliorez votre CV et vos compétences
+• Consultez les nouvelles offres régulièrement sur DZ-Stagiaire
+
+De nombreuses opportunités vous attendent sur notre plateforme !
+
+Cordialement,
+L'équipe DZ-Stagiaire"""
+
+    elif new_status == 'PRESELECTED':
+        subject = f"✨ Bonne nouvelle ! Vous êtes présélectionné(e) - {offer_title}"
+        body = f"""Bonjour,
+
+Bonne nouvelle ! ✨
+
+Votre candidature pour le {offer_type_label} "{offer_title}" a retenu l'attention de l'entreprise.
+
+Vous êtes maintenant PRÉSÉLECTIONNÉ(E) pour cette offre.
+
+L'entreprise examinera votre profil de plus près. Restez attentif(ve) à vos emails et messages sur la plateforme.
+
+Connectez-vous à votre espace pour plus de détails.
+
+Cordialement,
+L'équipe DZ-Stagiaire"""
+
+    else:
+        subject = f"Mise à jour de votre candidature - {offer_title}"
+        body = f"""Bonjour,
+
+Le statut de votre candidature pour le {offer_type_label} "{offer_title}" a été mis à jour.
 
 Nouveau statut : {status_text}
 
@@ -131,6 +219,7 @@ Connectez-vous à votre espace pour plus de détails.
 
 Cordialement,
 L'équipe DZ-Stagiaire"""
+    
     return send_email(student_email, subject, body)
 
 

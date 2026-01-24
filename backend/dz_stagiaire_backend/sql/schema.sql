@@ -42,6 +42,11 @@ CREATE TABLE students (
     cv_path VARCHAR(255),
     linkedin_url VARCHAR(255),
     github_url VARCHAR(255),
+    portfolio_url VARCHAR(255),
+
+    phone VARCHAR(20),
+    wilaya VARCHAR(50),
+    avatar_path VARCHAR(255),
     is_public BOOLEAN DEFAULT TRUE,
     views_count INT DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -57,6 +62,9 @@ CREATE TABLE companies (
     website VARCHAR(255),
     logo_path VARCHAR(255),
     size VARCHAR(50),
+    phone VARCHAR(20),
+    wilaya VARCHAR(50),
+    address TEXT,
     is_verified BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -67,7 +75,7 @@ CREATE TABLE offers (
     company_id INT NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
-    type ENUM('STAGE', 'PFE') NOT NULL,
+    type ENUM('STAGE', 'PFE', 'EMPLOI') NOT NULL,
     duration VARCHAR(50),
     location VARCHAR(100),
     skills TEXT, -- JSON or Comma Separated

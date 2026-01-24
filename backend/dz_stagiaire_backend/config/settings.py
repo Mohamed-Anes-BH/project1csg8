@@ -3,7 +3,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables
+load_dotenv(BASE_DIR / '.env')
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -93,6 +97,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 
+# Media files (Uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -115,6 +123,7 @@ MYSQL_CONFIG = {
     'password': os.getenv('DB_PASSWORD', ''),
     'host': os.getenv('DB_HOST', 'localhost'),
     'database': os.getenv('DB_NAME', 'dz_stagiaire'),
+    'port': int(os.getenv('DB_PORT', 3306)),
     'raise_on_warnings': True
 }
 

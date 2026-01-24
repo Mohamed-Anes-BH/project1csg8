@@ -28,11 +28,20 @@ def verify_password(password, hashed_password):
 check_password = verify_password
 
 
+import random
+
 def generate_token():
     """
-    Génère un token aléatoire pour la vérification email ou réinitialisation de mot de passe.
+    Génère un token aléatoire (UUID) pour la réinitialisation de mot de passe.
     """
     return str(uuid.uuid4())
+
+
+def generate_verification_code():
+    """
+    Génère un code à 6 chiffres pour la vérification d'email.
+    """
+    return ''.join([str(random.randint(0, 9)) for _ in range(6)])
 
 
 def verify_token(token, stored_token):

@@ -42,7 +42,7 @@ SELECT
     (SELECT views_count FROM students WHERE user_id = %s) as views_count;
 
 -- name: get_student_profile_full
-SELECT s.*, u.email 
+SELECT s.*, u.email, u.email_alerts 
 FROM students s 
 JOIN users u ON s.user_id = u.id 
 WHERE s.user_id = %s;
@@ -160,11 +160,19 @@ WHERE a.student_id = %s
 ORDER BY a.created_at DESC;
 
 -- name: list_applications_company
-SELECT a.*, o.title as offer_title, s.first_name, s.last_name, s.cv_path 
+SELECT a.*, o.title as offer_title, s.first_name, s.last_name, s.cv_path, s.title as student_title, s.education_level, s.avatar_path
 FROM applications a 
 JOIN offers o ON a.offer_id = o.id 
 JOIN students s ON a.student_id = s.user_id 
 WHERE o.company_id = %s
+ORDER BY a.created_at DESC;
+
+-- name: list_recent_applications_company
+SELECT a.*, o.title as offer_title, s.first_name, s.last_name, s.cv_path, s.title as student_title, s.education_level, s.avatar_path
+FROM applications a 
+JOIN offers o ON a.offer_id = o.id 
+JOIN students s ON a.student_id = s.user_id 
+WHERE o.company_id = %s AND a.created_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
 ORDER BY a.created_at DESC;
 
 -- name: check_already_applied
@@ -298,6 +306,131 @@ FROM offers o
 JOIN companies c ON o.company_id = c.user_id 
 WHERE o.deleted_at IS NULL;
 
+-- name: admin_get_dashboard_stats
+SELECT 
+    (SELECT COUNT(*) FROM users WHERE role = 'STUDENT') as total_students,
+    (SELECT COUNT(*) FROM users WHERE role = 'COMPANY') as total_companies,
+    (SELECT COUNT(*) FROM offers WHERE deleted_at IS NULL AND status = 'OPEN') as active_offers,
+    (SELECT COUNT(*) FROM applications WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) as new_applications_24h,
+    (SELECT COUNT(*) FROM users WHERE is_verified = FALSE) as pending_verifications,
+    (SELECT COUNT(*) FROM offers WHERE deleted_at IS NULL AND is_approved = FALSE AND status = 'OPEN') as pending_offers,
+    (SELECT COUNT(*) FROM reports WHERE status = 'PENDING') as pending_reports;
+
+-- name: admin_get_growth_stats
+SELECT 
+    YEAR(created_at) as year,
+    MONTH(created_at) as month,
+    COUNT(*) as count
+FROM users
+WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+GROUP BY YEAR(created_at), MONTH(created_at)
+ORDER BY year, month;
+
+-- name: admin_get_recent_activities
+SELECT * FROM activity_logs 
+ORDER BY created_at DESC 
+LIMIT %s;
+
+-- name: admin_create_activity
+INSERT INTO activity_logs (type, user_id, target_id, target_type, description, metadata)
+VALUES (%s, %s, %s, %s, %s, %s);
+
+-- name: admin_get_recent_applications
+SELECT a.id, a.status, a.created_at,
+    s.first_name, s.last_name,
+    o.title as offer_title, o.type as offer_type,
+    c.name as company_name
+FROM applications a
+JOIN students s ON a.student_id = s.user_id
+JOIN offers o ON a.offer_id = o.id
+JOIN companies c ON o.company_id = c.user_id
+ORDER BY a.created_at DESC
+LIMIT %s;
+
+-- name: admin_get_users_with_profiles
+SELECT u.id, u.email, u.role, u.is_verified, u.created_at,
+    CASE 
+        WHEN u.role = 'STUDENT' THEN s.first_name
+        WHEN u.role = 'COMPANY' THEN c.name
+        ELSE NULL
+    END as name,
+    CASE 
+        WHEN u.role = 'STUDENT' THEN s.last_name
+        ELSE NULL
+    END as last_name,
+    CASE 
+        WHEN u.role = 'STUDENT' THEN s.avatar_path
+        WHEN u.role = 'COMPANY' THEN c.logo_path
+        ELSE NULL
+    END as avatar
+FROM users u
+LEFT JOIN students s ON u.id = s.user_id AND u.role = 'STUDENT'
+LEFT JOIN companies c ON u.id = c.user_id AND u.role = 'COMPANY'
+ORDER BY u.created_at DESC;
+
+-- name: admin_get_offers_for_moderation
+SELECT o.*, c.name as company_name, c.logo_path as company_logo,
+    (SELECT COUNT(*) FROM applications WHERE offer_id = o.id) as applications_count,
+    (SELECT COUNT(*) FROM reports WHERE target_id = o.id AND target_type = 'OFFER' AND status = 'PENDING') as reports_count
+FROM offers o
+JOIN companies c ON o.company_id = c.user_id
+WHERE o.deleted_at IS NULL
+ORDER BY o.created_at DESC;
+
+-- name: admin_approve_offer
+UPDATE offers SET is_approved = TRUE, approved_by = %s, approved_at = NOW() WHERE id = %s;
+
+-- name: admin_reject_offer
+UPDATE offers SET status = 'ARCHIVED', deleted_at = NOW() WHERE id = %s;
+
+-- name: admin_get_settings
+SELECT * FROM admin_settings ORDER BY category, setting_key;
+
+-- name: admin_get_setting
+SELECT * FROM admin_settings WHERE setting_key = %s;
+
+-- name: admin_update_setting
+UPDATE admin_settings SET setting_value = %s, updated_by = %s, updated_at = NOW() WHERE setting_key = %s;
+
+-- name: admin_get_reports
+SELECT r.*, 
+    u.email as reporter_email,
+    CASE 
+        WHEN r.target_type = 'OFFER' THEN o.title
+        WHEN r.target_type = 'USER' THEN tu.email
+        ELSE NULL
+    END as target_name
+FROM reports r
+JOIN users u ON r.reporter_id = u.id
+LEFT JOIN offers o ON r.target_type = 'OFFER' AND r.target_id = o.id
+LEFT JOIN users tu ON r.target_type = 'USER' AND r.target_id = tu.id
+ORDER BY r.created_at DESC;
+
+-- name: admin_update_report
+UPDATE reports SET status = %s, admin_note = %s, reviewed_by = %s, reviewed_at = NOW() WHERE id = %s;
+
+-- name: admin_create_user
+INSERT INTO users (email, password_hash, role, is_verified, created_at) VALUES (%s, %s, %s, TRUE, NOW());
+
+-- name: admin_delete_user
+DELETE FROM users WHERE id = %s;
+
+-- name: admin_get_monthly_stats
+SELECT * FROM monthly_stats WHERE year = %s ORDER BY month;
+
+-- name: admin_update_monthly_stats
+INSERT INTO monthly_stats (year, month, total_users, total_students, total_companies, total_offers, total_applications, new_users, new_offers, new_applications)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+ON DUPLICATE KEY UPDATE 
+    total_users = VALUES(total_users),
+    total_students = VALUES(total_students),
+    total_companies = VALUES(total_companies),
+    total_offers = VALUES(total_offers),
+    total_applications = VALUES(total_applications),
+    new_users = VALUES(new_users),
+    new_offers = VALUES(new_offers),
+    new_applications = VALUES(new_applications);
+
 
 -- ==========================================
 -- SYSTEM TASKS
@@ -354,7 +487,7 @@ WHERE o.company_id = %s AND o.deleted_at IS NULL
 ORDER BY o.created_at DESC;
 
 -- name: filter_applications_by_status
-SELECT a.*, o.title as offer_title, s.first_name, s.last_name, s.cv_path, u.email as student_email
+SELECT a.*, o.title as offer_title, s.first_name, s.last_name, s.cv_path, s.title as student_title, s.education_level, s.avatar_path, u.email as student_email
 FROM applications a 
 JOIN offers o ON a.offer_id = o.id 
 JOIN students s ON a.student_id = s.user_id 
@@ -363,7 +496,7 @@ WHERE o.company_id = %s AND a.status = %s
 ORDER BY a.created_at DESC;
 
 -- name: filter_applications_by_offer
-SELECT a.*, o.title as offer_title, s.first_name, s.last_name, s.cv_path, u.email as student_email
+SELECT a.*, o.title as offer_title, s.first_name, s.last_name, s.cv_path, s.title as student_title, s.education_level, s.avatar_path, u.email as student_email
 FROM applications a 
 JOIN offers o ON a.offer_id = o.id 
 JOIN students s ON a.student_id = s.user_id
@@ -409,6 +542,8 @@ WHERE o.status = 'OPEN' AND o.deleted_at IS NULL;
 -- name: get_student_dashboard_full
 SELECT 
     (SELECT COUNT(*) FROM applications WHERE student_id = %s) as applications_count,
+    (SELECT COUNT(*) FROM applications WHERE student_id = %s AND status = 'ACCEPTED') as accepted_count,
+    (SELECT COUNT(*) FROM applications WHERE student_id = %s AND status = 'REJECTED') as refused_count,
     (SELECT COUNT(*) FROM saved_offers WHERE student_id = %s) as saved_offers_count,
     (SELECT views_count FROM students WHERE user_id = %s) as views_count,
     (SELECT COUNT(*) FROM notifications WHERE user_id = %s AND is_read = FALSE) as unread_notifications;
@@ -416,11 +551,11 @@ SELECT
 -- name: get_company_dashboard_full
 SELECT 
     (SELECT COUNT(*) FROM offers WHERE company_id = %s AND deleted_at IS NULL) as total_offers,
-    (SELECT COUNT(*) FROM offers WHERE company_id = %s AND status = 'OPEN' AND deleted_at IS NULL) as active_offers,
+    (SELECT COUNT(*) FROM offers WHERE company_id = %s AND status IN ('OPEN', 'ACTIVE') AND deleted_at IS NULL) as active_offers,
     (SELECT COUNT(*) FROM offers WHERE company_id = %s AND status = 'DRAFT' AND deleted_at IS NULL) as draft_offers,
     (SELECT COUNT(*) FROM applications a JOIN offers o ON a.offer_id = o.id WHERE o.company_id = %s) as applications_received,
     (SELECT COUNT(*) FROM applications a JOIN offers o ON a.offer_id = o.id WHERE o.company_id = %s AND a.status = 'PENDING') as pending_applications,
-    (SELECT SUM(views) FROM offers WHERE company_id = %s) as total_views,
+    (SELECT COALESCE(SUM(views), 0) FROM offers WHERE company_id = %s) as total_views,
     (SELECT COUNT(*) FROM notifications WHERE user_id = %s AND is_read = FALSE) as unread_notifications;
 
 
@@ -471,3 +606,16 @@ FROM users u
 JOIN companies c ON u.id = c.user_id
 WHERE u.is_verified = TRUE 
 AND (c.description IS NULL OR c.industry IS NULL OR c.logo_path IS NULL);
+
+-- ==========================================
+-- OFFER TRACKING (UNIQUE VIEWS)
+-- ==========================================
+
+-- name: track_offer_view
+INSERT IGNORE INTO offer_views (offer_id, student_id) VALUES (%s, %s);
+
+-- name: count_offer_views
+SELECT COUNT(*) as count FROM offer_views WHERE offer_id = %s;
+
+-- name: update_offer_view_count
+UPDATE offers SET views = (SELECT COUNT(*) FROM offer_views WHERE offer_id = %s) WHERE id = %s;

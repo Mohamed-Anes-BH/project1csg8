@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     StudentDashboardView, StudentProfileView, ToggleVisibilityView, 
     UploadCVView, SavedOffersView, PublicStudentProfileView, 
-    RecommendationsView, StudentSettingsView
+    RecommendationsView, StudentSettingsView, UploadAvatarView
 )
 
 urlpatterns = [
@@ -17,8 +17,9 @@ urlpatterns = [
     path('visibility/', ToggleVisibilityView.as_view(), name='toggle-visibility'),
     path('settings/', StudentSettingsView.as_view(), name='student-settings'),
     
-    # CV
+    # CV & Avatar
     path('upload-cv/', UploadCVView.as_view(), name='upload-cv'),
+    path('upload-avatar/', UploadAvatarView.as_view(), name='upload-avatar'),
     
     # Offres sauvegardées
     path('saved-offers/', SavedOffersView.as_view(), name='saved-offers'),

@@ -24,20 +24,30 @@ class OfferListView(APIView):
         type_filter = request.query_params.get('type')
         location_filter = request.query_params.get('location')
         duration_filter = request.query_params.get('duration')
+        company_filter = request.query_params.get('company')
         sort = request.query_params.get('sort', 'recent')
         page = request.query_params.get('page', 1)
         limit = request.query_params.get('limit', 10)
         
-        query = queries['list_offers_base']
+        # Remove trailing semicolon if present to allow appending clauses
+        query = queries['list_offers_base'].rstrip('; \t\n')
         params = []
         
         if search:
-            query += " AND (o.title LIKE %s OR o.description LIKE %s OR o.skills LIKE %s)"
-            params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+            # Split into individual words for more flexible search (e.g. "Stage Java" finds "Stage PFE Java")
+            # "sous mot" logic applied to each word keyword
+            keywords = search.strip().split()
+            for word in keywords:
+                query += " AND (o.title LIKE %s OR c.name LIKE %s)"
+                params.extend([f"%{word}%", f"%{word}%"])
             
         if type_filter:
             query += " AND o.type = %s"
             params.append(type_filter.upper())
+            
+        if company_filter:
+            query += " AND o.company_id = %s"
+            params.append(company_filter)
             
         if location_filter:
             query += " AND o.location LIKE %s"
@@ -77,8 +87,8 @@ class OfferListView(APIView):
         if not title or not description or not type_:
             return Response({'error': 'Champs obligatoires manquants'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if type_.upper() not in ['STAGE', 'PFE']:
-            return Response({'error': 'Type invalide. Utilisez STAGE ou PFE'}, status=status.HTTP_400_BAD_REQUEST)
+        if type_.upper() not in ['STAGE', 'PFE', 'EMPLOI']:
+            return Response({'error': 'Type invalide. Utilisez STAGE, PFE ou EMPLOI'}, status=status.HTTP_400_BAD_REQUEST)
             
         # Par défaut, créer en mode brouillon
         is_draft = data.get('is_draft', True)
@@ -111,12 +121,27 @@ class OfferDetailView(APIView):
 
     def get(self, request, pk):
         """Voir le détail d'une offre."""
-        # Incrémenter les vues
-        execute_query(queries['increment_offer_views'], (pk,), commit=True)
+        # Incrémenter les vues (simple compteur) pour tout le monde sauf l'auteur (entreprise)
+        if not (request.user.is_authenticated and request.user.role == 'COMPANY'):
+            try:
+                execute_query("UPDATE offers SET views = views + 1 WHERE id = %s", (pk,), commit=True)
+            except Exception as e:
+                print(f"View increment error: {e}")
         
         offer = execute_query(queries['get_offer_detail'], (pk,), fetch_one=True)
         if not offer:
             return Response({'error': 'Offre non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check application status and saved status for students
+        if request.user.is_authenticated and request.user.role == 'STUDENT':
+            app = execute_query("SELECT status FROM applications WHERE offer_id = %s AND student_id = %s", (pk, request.user.id), fetch_one=True)
+            offer['application_status'] = app['status'] if app else None
+            
+            # Check if offer is saved/bookmarked
+            saved = execute_query("SELECT offer_id FROM saved_offers WHERE offer_id = %s AND student_id = %s", (pk, request.user.id), fetch_one=True)
+            offer['is_saved'] = saved is not None
+        else:
+            offer['is_saved'] = False
             
         return Response(offer)
 

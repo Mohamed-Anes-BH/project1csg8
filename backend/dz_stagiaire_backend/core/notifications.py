@@ -11,7 +11,12 @@ def create_notification(user_id, type, content):
     # Check if user wants email alerts
     user = execute_query(queries['get_user_email_and_alerts'], (user_id,), fetch_one=True)
     if user and user['email_alerts']:
-        send_notification_email(user['email'], f"DZ-Stagiaire : {type}", content)
+        import threading
+        email_thread = threading.Thread(
+            target=send_notification_email,
+            args=(user['email'], f"DZ-Stagiaire : {type}", content)
+        )
+        email_thread.start()
 
 
 def get_user_notifications(user_id):
